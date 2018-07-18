@@ -323,7 +323,7 @@ class Painter {
                     }
                 }
 
-                if (!coords.length) continue;
+                if (!coords.length && layer.type !== 'custom') continue;
 
                 this.renderLayer(this, (sourceCache: any), layer, coords);
             }

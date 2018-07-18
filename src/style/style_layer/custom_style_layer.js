@@ -18,6 +18,10 @@ class CustomStyleLayer extends StyleLayer {
             false;
     }
 
+    hasOffscreenPass() {
+        return this.implementation.render3D !== undefined;
+    }
+
     recalculate() {}
     updateTransitions() {};
 
