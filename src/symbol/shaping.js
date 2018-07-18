@@ -9,6 +9,7 @@ import { plugin as rtlTextPlugin } from '../source/rtl_text_plugin';
 
 import type {StyleGlyph} from '../style/style_glyph';
 import type {ImagePosition} from '../render/image_atlas';
+import type {Formatted} from '../style-spec/expression/definitions/formatted';
 
 const WritingMode = {
     horizontal: 1,
@@ -53,7 +54,7 @@ function breakLines(text: string, lineBreakPoints: Array<number>) {
     return lines;
 }
 
-function shapeText(text: string,
+function shapeText(text: string | Formatted,
                    glyphs: {[number]: ?StyleGlyph},
                    maxWidth: number,
                    lineHeight: number,

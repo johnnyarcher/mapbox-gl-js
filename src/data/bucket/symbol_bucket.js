@@ -18,6 +18,7 @@ import Anchor from '../../symbol/anchor';
 import { getSizeData } from '../../symbol/symbol_size';
 import { register } from '../../util/web_worker_transfer';
 import EvaluationParameters from '../../style/evaluation_parameters';
+import type {Formatted} from '../../style-spec/expression/definitions/formatted';
 
 import type {
     Bucket,
@@ -53,7 +54,7 @@ export type CollisionArrays = {
 };
 
 export type SymbolFeature = {|
-    text: string | void,
+    text: string | Formatted | void,
     icon: string | void,
     index: number,
     sourceLayerIndex: number,

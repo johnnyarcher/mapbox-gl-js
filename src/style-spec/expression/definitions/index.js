@@ -1,6 +1,6 @@
 // @flow
 
-import { NumberType, StringType, BooleanType, ColorType, ObjectType, ValueType, ErrorType, CollatorType, array, toString } from '../types';
+import { NumberType, StringType, BooleanType, ColorType, ObjectType, ValueType, ErrorType, CollatorType, FormattedType, array, toString } from '../types';
 
 import { typeOf, Color, validateRGBA } from '../values';
 import CompoundExpression from '../compound_expression';
@@ -19,6 +19,7 @@ import Interpolate from './interpolate';
 import Coalesce from './coalesce';
 import { Equals, NotEquals } from './equals';
 import { CollatorExpression } from './collator';
+import { Formatted, FormattedExpression } from './formatted';
 import Length from './length';
 
 import type { Type } from '../types';
@@ -35,6 +36,7 @@ const expressions: ExpressionRegistry = {
     'case': Case,
     'coalesce': Coalesce,
     'collator': CollatorExpression,
+    'formatted': FormattedExpression,
     'interpolate': Interpolate,
     'length': Length,
     'let': Let,
@@ -116,7 +118,7 @@ CompoundExpression.register(expressions, {
                 return '';
             } else if (type === 'string' || type === 'number' || type === 'boolean') {
                 return String(v);
-            } else if (v instanceof Color) {
+            } else if (v instanceof Color || v instanceof Formatted) {
                 return v.toString();
             } else {
                 return JSON.stringify(v);
@@ -570,11 +572,25 @@ CompoundExpression.register(expressions, {
         [StringType],
         (ctx, [s]) => s.evaluate(ctx).toLowerCase()
     ],
-    'concat': [
-        StringType,
-        varargs(StringType),
-        (ctx, args) => args.map(arg => arg.evaluate(ctx)).join('')
-    ],
+    'concat': {
+        type: StringType,
+        overloads: [
+            [
+                varargs(StringType),
+                (ctx, args) => args.map(arg => arg.evaluate(ctx)).join('')
+            ],
+            [
+                varargs(FormattedType),
+                (ctx, args) => {
+                    return new Formatted(
+                        [].concat(
+                            args.map(arg => arg.evaluate(ctx).sections)
+                        )
+                    );
+                }
+            ]
+        ]
+    },
     'resolved-locale': [
         StringType,
         [CollatorType],
