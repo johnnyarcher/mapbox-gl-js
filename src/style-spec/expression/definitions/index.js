@@ -583,9 +583,8 @@ CompoundExpression.register(expressions, {
                 varargs(FormattedType),
                 (ctx, args) => {
                     return new Formatted(
-                        [].concat(
-                            args.map(arg => arg.evaluate(ctx).sections)
-                        )
+                        args.map(arg => arg.evaluate(ctx).sections)
+                            .reduce((acc, val) => acc.concat(val), [])
                     );
                 }
             ]

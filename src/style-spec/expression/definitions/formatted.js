@@ -51,7 +51,8 @@ export class FormattedExpression implements Expression {
 
         const text = context.parse(args[1], 1, ValueType);
         if (!text) return null;
-        if (text.type !== 'string' && text.type !== 'value' && text.type !== 'null')
+        const kind = text.type.kind;
+        if (kind !== 'string' && kind !== 'value' && kind !== 'null')
             return context.error(`Formatted text type must be 'string', 'value', or 'null'.`);
 
         const options = (args[2]: any);

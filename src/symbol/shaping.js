@@ -89,7 +89,7 @@ function shapeText(text: string | Formatted,
                 scale: section.scale || 1,
                 fontStack: section.fontStack || rootFontStack
             });
-            for (let j = 0; i < section.text.length; j++) {
+            for (let j = 0; j < section.text.length; j++) {
                 logicalInput.text.push({ charCode: section.text.charCodeAt(j), section: i });
             }
         }

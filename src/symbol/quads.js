@@ -152,8 +152,8 @@ export function getGlyphQuads(anchor: Anchor,
             [positionedGlyph.x + halfAdvance + textOffset[0], positionedGlyph.y + textOffset[1]];
 
 
-        const x1 = glyph.metrics.left - rectBuffer - halfAdvance + builtInOffset[0];
-        const y1 = -glyph.metrics.top - rectBuffer + builtInOffset[1];
+        const x1 = glyph.metrics.left * positionedGlyph.scale - rectBuffer - halfAdvance + builtInOffset[0];
+        const y1 = -glyph.metrics.top * positionedGlyph.scale - rectBuffer + builtInOffset[1];
         const x2 = x1 + rect.w * positionedGlyph.scale;
         const y2 = y1 + rect.h * positionedGlyph.scale;
 
