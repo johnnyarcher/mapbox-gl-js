@@ -119,7 +119,7 @@ export function getGlyphQuads(anchor: Anchor,
                        layer: SymbolStyleLayer,
                        alongLine: boolean,
                        feature: Feature,
-                       positions: {[number]: GlyphPosition}): Array<SymbolQuad> {
+                       positions: {[string]: {[number]: GlyphPosition}}): Array<SymbolQuad> {
 
     const oneEm = 24;
     const textRotate = layer.layout.get('text-rotate').evaluate(feature, {}) * Math.PI / 180;
@@ -131,7 +131,7 @@ export function getGlyphQuads(anchor: Anchor,
 
     for (let k = 0; k < positionedGlyphs.length; k++) {
         const positionedGlyph = positionedGlyphs[k];
-        const glyph = positions[positionedGlyph.glyph];
+        const glyph = positions[positionedGlyph.fontStack][positionedGlyph.glyph];
         if (!glyph) continue;
 
         const rect = glyph.rect;
@@ -141,7 +141,7 @@ export function getGlyphQuads(anchor: Anchor,
         const glyphPadding = 1.0;
         const rectBuffer = GLYPH_PBF_BORDER + glyphPadding;
 
-        const halfAdvance = glyph.metrics.advance / 2;
+        const halfAdvance = glyph.metrics.advance * positionedGlyph.scale / 2;
 
         const glyphOffset = alongLine ?
             [positionedGlyph.x + halfAdvance, positionedGlyph.y] :
@@ -154,8 +154,8 @@ export function getGlyphQuads(anchor: Anchor,
 
         const x1 = glyph.metrics.left - rectBuffer - halfAdvance + builtInOffset[0];
         const y1 = -glyph.metrics.top - rectBuffer + builtInOffset[1];
-        const x2 = x1 + rect.w;
-        const y2 = y1 + rect.h;
+        const x2 = x1 + rect.w * positionedGlyph.scale;
+        const y2 = y1 + rect.h * positionedGlyph.scale;
 
         const tl = new Point(x1, y1);
         const tr = new Point(x2, y1);

@@ -100,25 +100,25 @@ export function performSymbolLayout(bucket: SymbolBucket,
 
     for (const feature of bucket.features) {
         const fontstack = layout.get('text-font').evaluate(feature, {}).join(',');
-        const glyphs = glyphMap[fontstack] || {};
-        const glyphPositionMap = glyphPositions[fontstack] || {};
+        const glyphPositionMap = glyphPositions;
 
         const shapedTextOrientations = {};
         const text = feature.text;
         if (text) {
             const textOffset: [number, number] = (layout.get('text-offset').evaluate(feature, {}).map((t)=> t * oneEm): any);
             const spacing = layout.get('text-letter-spacing').evaluate(feature, {}) * oneEm;
-            const spacingIfAllowed = allowsLetterSpacing(text) ? spacing : 0;
+            const spacingIfAllowed = spacing; // TODO: allowsLetterSpacing(text) ? spacing : 0;
             const textAnchor = layout.get('text-anchor').evaluate(feature, {});
             const textJustify = layout.get('text-justify').evaluate(feature, {});
             const maxWidth = layout.get('symbol-placement') === 'point' ?
                 layout.get('text-max-width').evaluate(feature, {}) * oneEm :
                 0;
 
-            shapedTextOrientations.horizontal = shapeText(text, glyphs, maxWidth, lineHeight, textAnchor, textJustify, spacingIfAllowed, textOffset, oneEm, WritingMode.horizontal);
-            if (allowsVerticalWritingMode(text) && textAlongLine && keepUpright) {
-                shapedTextOrientations.vertical = shapeText(text, glyphs, maxWidth, lineHeight, textAnchor, textJustify, spacingIfAllowed, textOffset, oneEm, WritingMode.vertical);
-            }
+            shapedTextOrientations.horizontal = shapeText(text, glyphMap, fontstack, maxWidth, lineHeight, textAnchor, textJustify, spacingIfAllowed, textOffset, oneEm, WritingMode.horizontal);
+            // TODO:
+            // if (allowsVerticalWritingMode(text) && textAlongLine && keepUpright) {
+            //     shapedTextOrientations.vertical = shapeText(text, glyphMap, fontstack, maxWidth, lineHeight, textAnchor, textJustify, spacingIfAllowed, textOffset, oneEm, WritingMode.vertical);
+            // }
         }
 
         let shapedIcon;
@@ -164,7 +164,7 @@ function addFeature(bucket: SymbolBucket,
                     feature: SymbolFeature,
                     shapedTextOrientations: any,
                     shapedIcon: PositionedIcon | void,
-                    glyphPositionMap: {[number]: GlyphPosition},
+                    glyphPositionMap: {[string]: {[number]: GlyphPosition}},
                     sizes: Sizes) {
     const layoutTextSize = sizes.layoutTextSize.evaluate(feature, {});
     const layoutIconSize = sizes.layoutIconSize.evaluate(feature, {});
@@ -278,7 +278,7 @@ function addTextVertices(bucket: SymbolBucket,
                          lineArray: {lineStartIndex: number, lineLength: number},
                          writingMode: number,
                          placedTextSymbolIndices: Array<number>,
-                         glyphPositionMap: {[number]: GlyphPosition},
+                         glyphPositionMap: {[string]: {[number]: GlyphPosition}},
                          sizes: Sizes) {
     const glyphQuads = getGlyphQuads(anchor, shapedText,
                             layer, textAlongLine, feature, glyphPositionMap);
@@ -341,7 +341,7 @@ function addSymbol(bucket: SymbolBucket,
                    iconAlongLine: boolean,
                    iconOffset: [number, number],
                    feature: SymbolFeature,
-                   glyphPositionMap: {[number]: GlyphPosition},
+                   glyphPositionMap: {[string]: {[number]: GlyphPosition}},
                    sizes: Sizes) {
     const lineArray = bucket.addToLineVertexArray(anchor, line);
 

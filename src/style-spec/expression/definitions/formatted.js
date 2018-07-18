@@ -1,6 +1,7 @@
 // @flow
 
-import { NumberType, ValueType, FormattedType, ArrayType } from '../types';
+import { NumberType, ValueType, FormattedType } from '../types';
+
 
 import type { Expression } from '../expression';
 import type EvaluationContext from '../evaluation_context';
@@ -9,20 +10,20 @@ import type { Type } from '../types';
 
 export class FormattedSection {
     text: string
-    size: number | null
+    scale: number | null
     fontStack: string | null
 
-    constructor(text: string, size: number | null, fontStack: string | null) {
+    constructor(text: string, scale: number | null, fontStack: string | null) {
         this.text = text;
-        this.size = size;
+        this.scale = scale;
         this.fontStack = fontStack;
     }
 }
 
 export class Formatted {
-    sections: [FormattedSection]
+    sections: Array<FormattedSection>
 
-    constructor(sections: [FormattedSection]) {
+    constructor(sections: Array<FormattedSection>) {
         this.sections = sections;
     }
 
@@ -34,13 +35,13 @@ export class Formatted {
 export class FormattedExpression implements Expression {
     type: Type;
     text: Expression;
-    size: Expression | null;
+    scale: Expression | null;
     font: Expression | null;
 
-    constructor(text: Expression, size: Expression | null, font: Expression | null) {
+    constructor(text: Expression, scale: Expression | null, font: Expression | null) {
         this.type = FormattedType;
         this.text = text;
-        this.size = size;
+        this.scale = scale;
         this.font = font;
     }
 
@@ -57,26 +58,26 @@ export class FormattedExpression implements Expression {
         if (typeof options !== "object" || Array.isArray(options))
             return context.error(`Format options argument must be an object.`);
 
-        let size = null;
-        if (options['text-size']) {
-            size = context.parse(options['text-size'], 1, NumberType); // What about zoom-dependent expressions?
-            if (!size) return null;
+        let scale = null;
+        if (options['font-scale']) {
+            scale = context.parse(options['font-scale'], 1, NumberType);
+            if (!scale) return null;
         }
 
         let font = null;
         if (options['text-font']) {
-            font = context.parse(options['text-font'], 1, ArrayType); // Require array of strings?
+            font = context.parse(options['text-font'], 1, ValueType); // Require array of strings?
             if (!font) return null;
         }
 
-        return new FormattedExpression(text, size, font);
+        return new FormattedExpression(text, scale, font);
     }
 
     evaluate(ctx: EvaluationContext) {
         return new Formatted([
             new FormattedSection(
                 this.text.evaluate(ctx),
-                this.size ? this.size.evaluate(ctx) : null,
+                this.scale ? this.scale.evaluate(ctx) : null,
                 this.font ? this.font.evaluate(ctx).join(',') : null
             )
         ]);
@@ -84,8 +85,8 @@ export class FormattedExpression implements Expression {
 
     eachChild(fn: (Expression) => void) {
         fn(this.text);
-        if (this.size) {
-            fn(this.siz);
+        if (this.scale) {
+            fn(this.scale);
         }
         if (this.font) {
             fn(this.font);
@@ -99,8 +100,8 @@ export class FormattedExpression implements Expression {
 
     serialize() {
         const options = {};
-        if (this.size) {
-            options['text-size'] = this.size.serialize();
+        if (this.scale) {
+            options['font-scale'] = this.scale.serialize();
         }
         if (this.font) {
             options['text-font'] = this.font.serialize();

@@ -9,7 +9,7 @@ import { plugin as rtlTextPlugin } from '../source/rtl_text_plugin';
 
 import type {StyleGlyph} from '../style/style_glyph';
 import type {ImagePosition} from '../render/image_atlas';
-import type {Formatted} from '../style-spec/expression/definitions/formatted';
+import {Formatted} from '../style-spec/expression/definitions/formatted';
 
 const WritingMode = {
     horizontal: 1,
@@ -24,7 +24,9 @@ export type PositionedGlyph = {
     glyph: number,
     x: number,
     y: number,
-    vertical: boolean
+    vertical: boolean,
+    scale: number,
+    fontStack: string // TODO: either don't store per glyph or reduce to a number?
 };
 
 // A collection of positioned glyphs and some metadata
@@ -40,22 +42,36 @@ export type Shaping = {
 type SymbolAnchor = 'center' | 'left' | 'right' | 'top' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 type TextJustify = 'left' | 'center' | 'right';
 
-function breakLines(text: string, lineBreakPoints: Array<number>) {
+type TaggedString = {
+    text: Array<{ charCode: number, section: number }>,
+    sections: Array<{ scale: number, fontStack: string }>
+};
+
+function breakLines(input: TaggedString, lineBreakPoints: Array<number>): Array<TaggedString> {
     const lines = [];
+    const text = input.text;
+    const sections = input.sections;
     let start = 0;
     for (const lineBreak of lineBreakPoints) {
-        lines.push(text.substring(start, lineBreak));
+        lines.push({
+            text: text.slice(start, lineBreak),
+            sections: sections
+        });
         start = lineBreak;
     }
 
     if (start < text.length) {
-        lines.push(text.substring(start, text.length));
+        lines.push({
+            text: text.slice(start, text.length),
+            sections: sections
+        });
     }
     return lines;
 }
 
 function shapeText(text: string | Formatted,
-                   glyphs: {[number]: ?StyleGlyph},
+                   glyphs: {[string]: {[number]: ?StyleGlyph}},
+                   rootFontStack: string,
                    maxWidth: number,
                    lineHeight: number,
                    textAnchor: SymbolAnchor,
@@ -64,9 +80,28 @@ function shapeText(text: string | Formatted,
                    translate: [number, number],
                    verticalHeight: number,
                    writingMode: 1 | 2): Shaping | false {
-    let logicalInput = text.trim();
+    const logicalInput: TaggedString = { text: [], sections: [] };
+    if (text instanceof Formatted) {
+        // TODO: reimplement trimming?
+        for (let i = 0; i < text.sections.length; i++) {
+            const section = text.sections[i];
+            logicalInput.sections.push({
+                scale: section.scale || 1,
+                fontStack: section.fontStack || rootFontStack
+            });
+            for (let j = 0; i < section.text.length; j++) {
+                logicalInput.text.push({ charCode: section.text.charCodeAt(j), section: i });
+            }
+        }
+    } else {
+        logicalInput.sections.push({ scale: 1, fontStack: rootFontStack });
+        const trimmed = text.trim();
+        for (let i = 0; i < trimmed.length; i++) {
+            logicalInput.text.push({ charCode: trimmed.charCodeAt(i), section: 0 });
+        }
+    }
     if (writingMode === WritingMode.vertical) {
-        logicalInput = verticalizePunctuation(logicalInput);
+        verticalizePunctuation(logicalInput.text);
     }
 
     const positionedGlyphs = [];
@@ -80,14 +115,15 @@ function shapeText(text: string | Formatted,
         writingMode
     };
 
-    let lines: Array<string>;
+    let lines: Array<TaggedString>;
 
-    const {processBidirectionalText} = rtlTextPlugin;
-    if (processBidirectionalText) {
-        lines = processBidirectionalText(logicalInput, determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
-    } else {
-        lines = breakLines(logicalInput, determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
-    }
+    // TODO:
+    // const {processBidirectionalText} = rtlTextPlugin;
+    // if (processBidirectionalText) {
+    //     lines = processBidirectionalText(logicalInput, determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
+    // } else {
+    lines = breakLines(logicalInput, determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
+    //}
 
     shapeLines(shaping, glyphs, lines, lineHeight, textAnchor, textJustify, writingMode, spacing, verticalHeight);
 
@@ -126,17 +162,19 @@ const breakable: {[number]: boolean} = {
     // See https://github.com/mapbox/mapbox-gl-js/issues/3658
 };
 
-function determineAverageLineWidth(logicalInput: string,
+function determineAverageLineWidth(logicalInput: TaggedString,
                                    spacing: number,
                                    maxWidth: number,
-                                   glyphs: {[number]: ?StyleGlyph}) {
+                                   glyphMap: {[string]: {[number]: ?StyleGlyph}}) {
     let totalWidth = 0;
 
-    for (let index = 0; index < logicalInput.length; index++) {
-        const glyph = glyphs[logicalInput.charCodeAt(index)];
+    for (let index = 0; index < logicalInput.text.length; index++) {
+        const taggedChar = logicalInput.text[index];
+        const section = logicalInput.sections[taggedChar.section];
+        const glyph = glyphMap[section.fontStack][taggedChar.charCode];
         if (!glyph)
             continue;
-        totalWidth += glyph.metrics.advance + spacing;
+        totalWidth += glyph.metrics.advance * section.scale + spacing;
     }
 
     const lineCount = Math.max(1, Math.ceil(totalWidth / maxWidth));
@@ -224,10 +262,10 @@ function leastBadBreaks(lastLineBreak: ?Break): Array<number> {
     return leastBadBreaks(lastLineBreak.priorBreak).concat(lastLineBreak.index);
 }
 
-function determineLineBreaks(logicalInput: string,
+function determineLineBreaks(logicalInput: TaggedString,
                              spacing: number,
                              maxWidth: number,
-                             glyphs: {[number]: ?StyleGlyph}): Array<number> {
+                             glyphMap: {[string]: {[number]: ?StyleGlyph}}): Array<number> {
     if (!maxWidth)
         return [];
 
@@ -235,20 +273,22 @@ function determineLineBreaks(logicalInput: string,
         return [];
 
     const potentialLineBreaks = [];
-    const targetWidth = determineAverageLineWidth(logicalInput, spacing, maxWidth, glyphs);
+    const targetWidth = determineAverageLineWidth(logicalInput, spacing, maxWidth, glyphMap);
 
     let currentX = 0;
 
-    for (let i = 0; i < logicalInput.length; i++) {
-        const codePoint = logicalInput.charCodeAt(i);
-        const glyph = glyphs[codePoint];
+    for (let i = 0; i < logicalInput.text.length; i++) {
+        const taggedChar = logicalInput.text[i];
+        const section = logicalInput.sections[taggedChar.section];
+        const codePoint = taggedChar.charCode;
+        const glyph = glyphMap[section.fontStack][codePoint];
 
         if (glyph && !whitespace[codePoint])
-            currentX += glyph.metrics.advance + spacing;
+            currentX += glyph.metrics.advance * section.scale + spacing;
 
         // Ideographic characters, spaces, and word-breaking punctuation that often appear without
         // surrounding spaces.
-        if ((i < logicalInput.length - 1) &&
+        if ((i < logicalInput.text.length - 1) &&
             (breakable[codePoint] ||
                 charAllowsIdeographicBreaking(codePoint))) {
 
@@ -258,14 +298,14 @@ function determineLineBreaks(logicalInput: string,
                     currentX,
                     targetWidth,
                     potentialLineBreaks,
-                    calculatePenalty(codePoint, logicalInput.charCodeAt(i + 1)),
+                    calculatePenalty(codePoint, logicalInput.text[i + 1].charCode),
                     false));
         }
     }
 
     return leastBadBreaks(
         evaluateBreak(
-            logicalInput.length,
+            logicalInput.text.length,
             currentX,
             targetWidth,
             potentialLineBreaks,
@@ -306,8 +346,8 @@ function getAnchorAlignment(anchor: SymbolAnchor) {
 }
 
 function shapeLines(shaping: Shaping,
-                    glyphs: {[number]: ?StyleGlyph},
-                    lines: Array<string>,
+                    glyphMap: {[string]: {[number]: ?StyleGlyph}},
+                    lines: Array<TaggedString>,
                     lineHeight: number,
                     textAnchor: SymbolAnchor,
                     textJustify: TextJustify,
@@ -327,26 +367,29 @@ function shapeLines(shaping: Shaping,
         textJustify === 'right' ? 1 :
         textJustify === 'left' ? 0 : 0.5;
 
-    for (let line of lines) {
-        line = line.trim();
+    for (const line of lines) {
+        // line = line.trim(); TODO: reimplement?
 
-        if (!line.length) {
+        if (!line.text.length) {
             y += lineHeight; // Still need a line feed after empty line
             continue;
         }
 
         const lineStartIndex = positionedGlyphs.length;
-        for (let i = 0; i < line.length; i++) {
-            const codePoint = line.charCodeAt(i);
-            const glyph = glyphs[codePoint];
+        for (let i = 0; i < line.text.length; i++) {
+            const taggedChar = line.text[i];
+            const section = line.sections[taggedChar.section];
+            const codePoint = taggedChar.charCode;
+            const glyph = glyphMap[section.fontStack][codePoint];
 
             if (!glyph) continue;
 
             if (!charHasUprightVerticalOrientation(codePoint) || writingMode === WritingMode.horizontal) {
-                positionedGlyphs.push({glyph: codePoint, x, y, vertical: false});
-                x += glyph.metrics.advance + spacing;
+                positionedGlyphs.push({glyph: codePoint, x, y, vertical: false, scale: section.scale, fontStack: section.fontStack});
+                x += glyph.metrics.advance * section.scale + spacing;
             } else {
-                positionedGlyphs.push({glyph: codePoint, x, y: 0, vertical: true});
+                positionedGlyphs.push({glyph: codePoint, x, y: 0, vertical: true, scale: section.scale, fontStack: section.fontStack});
+                // TODO: Haven't thought about vertical text with variable size spacing yet
                 x += verticalHeight + spacing;
             }
         }
@@ -356,7 +399,7 @@ function shapeLines(shaping: Shaping,
             const lineLength = x - spacing;
             maxLineLength = Math.max(lineLength, maxLineLength);
 
-            justifyLine(positionedGlyphs, glyphs, lineStartIndex, positionedGlyphs.length - 1, justify);
+            justifyLine(positionedGlyphs, glyphMap, lineStartIndex, positionedGlyphs.length - 1, justify);
         }
 
         x = 0;
@@ -377,16 +420,17 @@ function shapeLines(shaping: Shaping,
 
 // justify right = 1, left = 0, center = 0.5
 function justifyLine(positionedGlyphs: Array<PositionedGlyph>,
-                     glyphs: {[number]: ?StyleGlyph},
+                     glyphMap: {[string]: {[number]: ?StyleGlyph}},
                      start: number,
                      end: number,
                      justify: 1 | 0 | 0.5) {
     if (!justify)
         return;
 
-    const glyph = glyphs[positionedGlyphs[end].glyph];
+    const lastPositionedGlyph = positionedGlyphs[end];
+    const glyph = glyphMap[lastPositionedGlyph.fontStack][lastPositionedGlyph.glyph];
     if (glyph) {
-        const lastAdvance = glyph.metrics.advance;
+        const lastAdvance = glyph.metrics.advance * lastPositionedGlyph.scale;
         const lineIndent = (positionedGlyphs[end].x + lastAdvance) * justify;
 
         for (let j = start; j <= end; j++) {
