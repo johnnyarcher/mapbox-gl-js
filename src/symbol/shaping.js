@@ -82,7 +82,6 @@ function shapeText(text: string | Formatted,
                    writingMode: 1 | 2): Shaping | false {
     const logicalInput: TaggedString = { text: [], sections: [] };
     if (text instanceof Formatted) {
-        // TODO: reimplement trimming?
         for (let i = 0; i < text.sections.length; i++) {
             const section = text.sections[i];
             logicalInput.sections.push({
@@ -95,9 +94,8 @@ function shapeText(text: string | Formatted,
         }
     } else {
         logicalInput.sections.push({ scale: 1, fontStack: rootFontStack });
-        const trimmed = text.trim();
-        for (let i = 0; i < trimmed.length; i++) {
-            logicalInput.text.push({ charCode: trimmed.charCodeAt(i), section: 0 });
+        for (let i = 0; i < text.length; i++) {
+            logicalInput.text.push({ charCode: text.charCodeAt(i), section: 0 });
         }
     }
     if (writingMode === WritingMode.vertical) {
@@ -161,6 +159,22 @@ const breakable: {[number]: boolean} = {
     // Consider "neutral orientation" characters at scriptDetection.charHasNeutralVerticalOrientation
     // See https://github.com/mapbox/mapbox-gl-js/issues/3658
 };
+
+function trimTaggedString(taggedString: TaggedString) {
+    let beginningWhitespace = 0;
+    for (let i = 0;
+        i < taggedString.text.length && whitespace[taggedString.text[i].charCode];
+        i++) {
+        beginningWhitespace++;
+    }
+    let trailingWhitespace = taggedString.text.length;
+    for (let i = taggedString.text.length - 1;
+        i >= 0 && i >= beginningWhitespace && whitespace[taggedString.text[i].charCode];
+        i--) {
+        trailingWhitespace--;
+    }
+    taggedString.text = taggedString.text.slice(beginningWhitespace, trailingWhitespace);
+}
 
 function determineAverageLineWidth(logicalInput: TaggedString,
                                    spacing: number,
@@ -368,7 +382,7 @@ function shapeLines(shaping: Shaping,
         textJustify === 'left' ? 0 : 0.5;
 
     for (const line of lines) {
-        // line = line.trim(); TODO: reimplement?
+        trimTaggedString(line);
 
         if (!line.text.length) {
             y += lineHeight; // Still need a line feed after empty line
@@ -391,8 +405,7 @@ function shapeLines(shaping: Shaping,
                 x += glyph.metrics.advance * section.scale + spacing;
             } else {
                 positionedGlyphs.push({glyph: codePoint, x, y: 0, vertical: true, scale: section.scale, fontStack: section.fontStack});
-                // TODO: Haven't thought about vertical text with variable size spacing yet
-                x += verticalHeight + spacing;
+                x += verticalHeight * section.scale + spacing;
             }
         }
 
