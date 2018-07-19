@@ -77,7 +77,7 @@ export class FormattedExpression implements Expression {
     evaluate(ctx: EvaluationContext) {
         return new Formatted([
             new FormattedSection(
-                this.text.evaluate(ctx),
+                this.text.evaluate(ctx) || "",
                 this.scale ? this.scale.evaluate(ctx) : null,
                 this.font ? this.font.evaluate(ctx).join(',') : null
             )
