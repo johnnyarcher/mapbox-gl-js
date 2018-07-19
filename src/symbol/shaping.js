@@ -375,6 +375,7 @@ function shapeLines(shaping: Shaping,
             continue;
         }
 
+        let maxScale = 0;
         const lineStartIndex = positionedGlyphs.length;
         for (let i = 0; i < line.text.length; i++) {
             const taggedChar = line.text[i];
@@ -384,6 +385,7 @@ function shapeLines(shaping: Shaping,
 
             if (!glyph) continue;
 
+            maxScale = Math.max(maxScale, section.scale);
             if (!charHasUprightVerticalOrientation(codePoint) || writingMode === WritingMode.horizontal) {
                 positionedGlyphs.push({glyph: codePoint, x, y, vertical: false, scale: section.scale, fontStack: section.fontStack});
                 x += glyph.metrics.advance * section.scale + spacing;
@@ -403,7 +405,7 @@ function shapeLines(shaping: Shaping,
         }
 
         x = 0;
-        y += lineHeight;
+        y += lineHeight * maxScale;
     }
 
     const {horizontalAlign, verticalAlign} = getAnchorAlignment(textAnchor);
