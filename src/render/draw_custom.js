@@ -62,7 +62,7 @@ function drawCustom(painter: Painter, sourceCache: SourceCache, layer: CustomSty
         context.setDepthMode(new DepthMode(gl.LEQUAL, DepthMode.ReadWrite, [0, 1]));
         context.setColorMode(painter.colorModeForRenderPass());
 
-        layer.implementation.render3D(painter.context.gl, painter.transform.customLayerMatrix(layer.implementation.translate, layer.implementation.scale));
+        layer.implementation.render3D(painter.context.gl, painter.transform.customLayerMatrix(layer.implementation.translate, layer.implementation.scale, layer.implementation.zScale));
 
 
         context.restore();

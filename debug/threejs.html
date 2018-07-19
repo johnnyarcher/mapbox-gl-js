@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mapbox GL JS debug page</title>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link rel='stylesheet' href='/dist/mapbox-gl.css' />
+    <style>
+        body { margin: 0; padding: 0; }
+        html, body, #map { height: 100%; }
+    </style>
+</head>
+
+<body>
+<div id='map'></div>
+
+<script src='/dist/mapbox-gl-dev.js'></script>
+<script src="three.js"></script>
+<script src='/debug/access_token_generated.js'></script>
+<script>
+
+function MapboxCamera() {
+    THREE.Camera.call(this);
+}
+
+MapboxCamera.prototype = Object.create(THREE.Camera.prototype);
+
+MapboxCamera.prototype.update = function(matrix) {
+    this.projectionMatrix.elements = new Float32Array(matrix);
+}
+
+var map = window.map = new mapboxgl.Map({
+    container: 'map',
+    zoom: 16.5,
+    center: [-79.396006, 43.659707],
+    bearing: -164,
+    pitch: 60,
+    style: 'mapbox://styles/mapbox/streets-v10',
+    hash: true
+});
+
+const mapboxCamera = new MapboxCamera();
+
+class Custom {
+    constructor() {
+        this.id = 'mycustomlayer';
+        this.type = 'custom';
+        this.translate = [0.27945743888888896, 0.364928466136303, 0.0000015];
+        this.scale = 0.000002;
+
+    }
+
+    render3D(gl, matrix) {
+        mapboxCamera.update(matrix);
+
+        cube.rotation.x += 0.01;
+        cube.rotation.y += 0.01;
+        //cube.rotation.x = 0.2;
+        //cube.rotation.y = 100;
+        renderer.state.reset();
+        //renderer.render( scene, camera );
+        gl.cullFace(gl.FRONT);
+        renderer.render( scene, mapboxCamera);
+gl.disable(gl.CULL_FACE);
+        map.painter.context.restore();
+    }
+
+    hasTransition() {
+        return true;
+        return false;
+    }
+
+}
+
+map.on('load', function() {
+    map.addLayer({
+        id: 'build',
+        type: 'fill-extrusion',
+        source: 'composite',
+        'source-layer': 'building',
+        paint: {
+            'fill-extrusion-color': '#ac5',
+            'fill-extrusion-height': 30
+        }
+    });
+    /*
+    map.addLayer({
+        id: 'builda',
+        type: 'fill-extrusion',
+        source: 'composite',
+        'source-layer': 'building',
+        paint: {
+            //'fill-extrusion-translate': [20, 10],
+            'fill-extrusion-color': '#a5c',
+            'fill-extrusion-height': 31
+        }
+    });
+    */
+    map.addLayer(new Custom());
+});
+
+const p = new Proxy(map.painter.context.gl, {
+    get: function(obj, prop) {
+        console.log('asdf', prop);
+        return obj[prop];
+    }
+});
+
+//map.painter.context.stash();
+
+var scene = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
+console.log(camera);
+
+var renderer = new THREE.WebGLRenderer({
+    canvas: map._canvas,
+    context: map.painter.context.gl,
+    depth: true,
+    stencil: false
+});
+const gl = map.painter.context.gl;
+//gl.cullFace(gl.FRONT);
+gl.disable(gl.CULL_FACE);
+renderer.autoClear = false;
+/*
+renderer.setSize( window.innerWidth, window.innerHeight );
+*/
+
+var geometry = new THREE.BoxGeometry( 1, 1, 1 );
+var material = new THREE.MeshNormalMaterial( { color: 0x00ff00 } );
+var cube = new THREE.Mesh( geometry, material );
+scene.add( cube );
+
+directionalLight = new THREE.DirectionalLight( 0xffffff );
+                directionalLight.position.set( 0, -70, 100 ).normalize();
+
+                scene.add(directionalLight);
+camera.position.z = 5;
+map.painter.context.restore();
+
+</script>
+</body>
+</html>

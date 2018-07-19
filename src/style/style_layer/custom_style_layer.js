@@ -30,7 +30,6 @@ class CustomStyleLayer extends StyleLayer {
     }
 
     resize() {
-        console.log('destroy');
         if (this.viewportFrame) {
             this.viewportFrame.destroy();
             this.viewportFrame = null;

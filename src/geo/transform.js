@@ -429,12 +429,16 @@ class Transform {
         return cache[posMatrixKey];
     }
 
-    customLayerMatrix(translate, scale): Float64Array {
+    customLayerMatrix(translate, scale, zScale): Float64Array {
 
+        //const verticalScale = this.worldSize / (2 * Math.PI * 6378137 * Math.abs(Math.cos(this.center.lat * (Math.PI / 180))));
+        const verticalScale = 1 / (2 * Math.PI * 6378137 * Math.abs(Math.cos(this.center.lat * (Math.PI / 180))));
+        //console.log(verticalScale, scale, scale/verticalScale);
+        //zScale = scale;//1 /verticalScale * scale;
         const posMatrix = mat4.identity(new Float64Array(16));
-        if (translate) mat4.translate(posMatrix, posMatrix, [translate[0], translate[1], 0]);
-        if (scale) mat4.scale(posMatrix, posMatrix, [scale, scale, 1]);
-        const proj = mat4.scale(new Float64Array(16), this.projMatrix, [this.worldSize, this.worldSize, 1]);
+        if (translate) mat4.translate(posMatrix, posMatrix, [translate[0], translate[1], translate[2] || 0]);
+        if (scale) mat4.scale(posMatrix, posMatrix, [scale, scale, scale]);
+        const proj = mat4.scale(new Float64Array(16), this.projMatrix, [this.worldSize, this.worldSize, 1/verticalScale]);
 
         return mat4.multiply(posMatrix, proj, posMatrix);
     }
