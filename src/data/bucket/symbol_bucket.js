@@ -406,14 +406,15 @@ class SymbolBucket implements Bucket {
                 const fontStack = textFont.evaluate(feature, {}).join(',');
                 const stack = stacks[fontStack] = stacks[fontStack] || {};
                 const textAlongLine = layout.get('text-rotation-alignment') === 'map' && layout.get('symbol-placement') !== 'point';
-                const doesAllowVerticalWritingMode = false; // TODO: allowsVerticalWritingMode(text);
                 if (text instanceof Formatted) {
                     for (const section of text.sections) {
+                        const doesAllowVerticalWritingMode = allowsVerticalWritingMode(text.toString());
                         const sectionFont = section.fontStack || fontStack;
                         const sectionStack = stacks[sectionFont] = stacks[sectionFont] || {};
                         this.calculateGlyphDependencies(section.text, sectionStack, textAlongLine, doesAllowVerticalWritingMode);
                     }
                 } else {
+                    const doesAllowVerticalWritingMode = allowsVerticalWritingMode(text);
                     this.calculateGlyphDependencies(text, stack, textAlongLine, doesAllowVerticalWritingMode);
                 }
 

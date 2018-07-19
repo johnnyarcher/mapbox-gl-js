@@ -18,6 +18,7 @@ import classifyRings from '../util/classify_rings';
 import EXTENT from '../data/extent';
 import SymbolBucket from '../data/bucket/symbol_bucket';
 import EvaluationParameters from '../style/evaluation_parameters';
+import {Formatted} from '../style-spec/expression/definitions/formatted';
 
 import type {Shaping, PositionedIcon} from './shaping';
 import type {CollisionBoxArray} from '../data/array_types';
@@ -105,9 +106,10 @@ export function performSymbolLayout(bucket: SymbolBucket,
         const shapedTextOrientations = {};
         const text = feature.text;
         if (text) {
+            const unformattedText = text instanceof Formatted ? text.toString() : text;
             const textOffset: [number, number] = (layout.get('text-offset').evaluate(feature, {}).map((t)=> t * oneEm): any);
             const spacing = layout.get('text-letter-spacing').evaluate(feature, {}) * oneEm;
-            const spacingIfAllowed = spacing; // TODO: allowsLetterSpacing(text) ? spacing : 0;
+            const spacingIfAllowed = allowsLetterSpacing(unformattedText) ? spacing : 0;
             const textAnchor = layout.get('text-anchor').evaluate(feature, {});
             const textJustify = layout.get('text-justify').evaluate(feature, {});
             const maxWidth = layout.get('symbol-placement') === 'point' ?
@@ -115,10 +117,9 @@ export function performSymbolLayout(bucket: SymbolBucket,
                 0;
 
             shapedTextOrientations.horizontal = shapeText(text, glyphMap, fontstack, maxWidth, lineHeight, textAnchor, textJustify, spacingIfAllowed, textOffset, oneEm, WritingMode.horizontal);
-            // TODO:
-            // if (allowsVerticalWritingMode(text) && textAlongLine && keepUpright) {
-            //     shapedTextOrientations.vertical = shapeText(text, glyphMap, fontstack, maxWidth, lineHeight, textAnchor, textJustify, spacingIfAllowed, textOffset, oneEm, WritingMode.vertical);
-            // }
+            if (allowsVerticalWritingMode(unformattedText) && textAlongLine && keepUpright) {
+                shapedTextOrientations.vertical = shapeText(text, glyphMap, fontstack, maxWidth, lineHeight, textAnchor, textJustify, spacingIfAllowed, textOffset, oneEm, WritingMode.vertical);
+            }
         }
 
         let shapedIcon;

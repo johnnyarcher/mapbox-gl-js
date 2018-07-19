@@ -2853,7 +2853,11 @@
         "text-padding": 1,
         "text-rotation-alignment": "map",
         "text-pitch-alignment": "viewport",
-        "text-field": "{name_en}",
+        "text-field": ["concat",
+            ["formatted", ["get", "name"], { "font-scale": 1.2 }],
+            ["formatted", " - ", {}],
+            ["formatted", ["get", "name_en"], { "font-scale": 0.8, "text-font": ["literal", [ "DIN Offc Pro Italic", "Arial Unicode MS Regular" ]] }]
+        ],
         "text-letter-spacing": 0.01
       },
       "paint": {
@@ -2884,7 +2888,11 @@
         "text-padding": 1,
         "text-rotation-alignment": "map",
         "text-pitch-alignment": "viewport",
-        "text-field": "{name_en}",
+        "text-field": ["concat",
+            ["formatted", ["get", "name"], { "font-scale": 1.2 }],
+            ["formatted", " - ", {}],
+            ["formatted", ["get", "name_en"], { "font-scale": 0.8, "text-font": ["literal", [ "DIN Offc Pro Italic", "Arial Unicode MS Regular" ]] }]
+        ],
         "text-letter-spacing": 0.01
       },
       "paint": {
@@ -2909,7 +2917,11 @@
         "text-padding": 1,
         "text-rotation-alignment": "map",
         "text-pitch-alignment": "viewport",
-        "text-field": "{name_en}",
+        "text-field": ["concat",
+            ["formatted", ["get", "name"], { "font-scale": 1.2 }],
+            ["formatted", " - ", {}],
+            ["formatted", ["get", "name_en"], { "font-scale": 0.8, "text-font": ["literal", [ "DIN Offc Pro Italic", "Arial Unicode MS Regular" ]] }]
+        ],
         "text-letter-spacing": 0.01
       },
       "paint": {
