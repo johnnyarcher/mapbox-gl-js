@@ -43,61 +43,97 @@ type SymbolAnchor = 'center' | 'left' | 'right' | 'top' | 'bottom' | 'top-left' 
 type TextJustify = 'left' | 'center' | 'right';
 
 class TaggedString {
-    text: Array<{ charCode: number, section: number }>
+    text: string;
+    sectionIndex: Array<number>
     sections: Array<{ scale: number, fontStack: string }>
 
-    constructor(text?: string | Formatted, rootFontStack?: string) {
-        this.text = [];
+    constructor() {
+        this.text = "";
+        this.sectionIndex = [];
         this.sections = [];
-
-        if (text) {
-            if (text instanceof Formatted) {
-                for (let i = 0; i < text.sections.length; i++) {
-                    const section = text.sections[i];
-                    this.sections.push({
-                        scale: section.scale || 1,
-                        fontStack: section.fontStack || rootFontStack
-                    });
-                    for (let j = 0; j < section.text.length; j++) {
-                        this.text.push({ charCode: section.text.charCodeAt(j), section: i });
-                    }
-                }
-            } else {
-                this.sections.push({ scale: 1, fontStack: rootFontStack });
-                for (let i = 0; i < text.length; i++) {
-                    this.text.push({ charCode: text.charCodeAt(i), section: 0 });
-                }
-            }
-        }
     }
 
-    toString() {
-        let result = "";
-        for (let i = 0; i < this.text.length; i++) {
-            result += String.fromCharCode(this.text[i].charCode);
+    static fromFeature(text: string | Formatted, rootFontStack: string) {
+        const result = new TaggedString();
+        if (text instanceof Formatted) {
+            for (let i = 0; i < text.sections.length; i++) {
+                const section = text.sections[i];
+                result.sections.push({
+                    scale: section.scale || 1,
+                    fontStack: section.fontStack || rootFontStack
+                });
+                result.text += section.text;
+                for (let j = 0; j < section.text.length; j++) {
+                    result.sectionIndex.push(i);
+                }
+            }
+        } else {
+            result.text = text;
+            result.sections.push({ scale: 1, fontStack: rootFontStack });
+            for (let i = 0; i < text.length; i++) {
+                result.sectionIndex.push(0);
+            }
         }
         return result;
+    }
+
+    length(): number {
+        return this.text.length;
+    }
+
+    getSection(index: number): { scale: number, fontStack: string } {
+        return this.sections[this.sectionIndex[index]];
+    }
+
+    getCharCode(index: number): number {
+        return this.text.charCodeAt(index);
+    }
+
+    verticalizePunctuation() {
+        this.text = verticalizePunctuation(this.text);
+    }
+
+    trim() {
+        let beginningWhitespace = 0;
+        for (let i = 0;
+            i < this.text.length && whitespace[this.text.charCodeAt(i)];
+            i++) {
+            beginningWhitespace++;
+        }
+        let trailingWhitespace = this.text.length;
+        for (let i = this.text.length - 1;
+            i >= 0 && i >= beginningWhitespace && whitespace[this.text.charCodeAt(i)];
+            i--) {
+            trailingWhitespace--;
+        }
+        this.text = this.text.substring(beginningWhitespace, trailingWhitespace);
+        this.sectionIndex = this.sectionIndex.slice(beginningWhitespace, trailingWhitespace);
+    }
+
+    substring(start: number, end: number): TaggedString {
+        const substring = new TaggedString();
+        substring.text = this.text.substring(start, end);
+        substring.sectionIndex = this.sectionIndex.slice(start, end);
+        substring.sections = this.sections;
+        return substring;
+    }
+
+    toString(): string {
+        return this.text;
     }
 }
 
 function breakLines(input: TaggedString, lineBreakPoints: Array<number>): Array<TaggedString> {
     const lines = [];
     const text = input.text;
-    const sections = input.sections;
     let start = 0;
     for (const lineBreak of lineBreakPoints) {
-        lines.push({
-            text: text.slice(start, lineBreak),
-            sections: sections
-        });
+        lines.push(input.substring(start, lineBreak));
         start = lineBreak;
     }
 
     if (start < text.length) {
-        lines.push({
-            text: text.slice(start, text.length),
-            sections: sections
-        });
+        lines.push(input.substring(start, text.length));
     }
     return lines;
 }
@@ -113,10 +149,10 @@ function shapeText(text: string | Formatted,
                    translate: [number, number],
                    verticalHeight: number,
                    writingMode: 1 | 2): Shaping | false {
-    const logicalInput = new TaggedString(text, rootFontStack);
+    const logicalInput = TaggedString.fromFeature(text, rootFontStack);
 
     if (writingMode === WritingMode.vertical) {
-        verticalizePunctuation(logicalInput.text);
+        logicalInput.verticalizePunctuation();
     }
 
     const positionedGlyphs = [];
@@ -134,20 +170,19 @@ function shapeText(text: string | Formatted,
 
     const {processBidirectionalText} = rtlTextPlugin;
     if (processBidirectionalText && logicalInput.sections.length === 1) {
+        lines = [];
         if (logicalInput.sections.length === 1) {
             // Bidi doesn't have to be style-aware
             const untaggedLines =
                 processBidirectionalText(logicalInput.toString(), determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
-            lines = [];
             for (const line of untaggedLines) {
-                const taggedLine = [];
+                const taggedLine = new TaggedString();
+                taggedLine.text = line;
+                taggedLine.sections = logicalInput.sections;
                 for (let i = 0; i < line.length; i++) {
-                    taggedLine.push({ charCode: line.charCodeAt(i), section: 0 });
+                    taggedLine.sectionIndex.push(0);
                 }
-                lines.push({
-                    text: taggedLine,
-                    sections: logicalInput.sections
-                });
+                lines.push(taggedLine);
             }
         }
     } else {
@@ -191,32 +226,15 @@ const breakable: {[number]: boolean} = {
     // See https://github.com/mapbox/mapbox-gl-js/issues/3658
 };
 
-function trimTaggedString(taggedString: TaggedString) {
-    let beginningWhitespace = 0;
-    for (let i = 0;
-        i < taggedString.text.length && whitespace[taggedString.text[i].charCode];
-        i++) {
-        beginningWhitespace++;
-    }
-    let trailingWhitespace = taggedString.text.length;
-    for (let i = taggedString.text.length - 1;
-        i >= 0 && i >= beginningWhitespace && whitespace[taggedString.text[i].charCode];
-        i--) {
-        trailingWhitespace--;
-    }
-    taggedString.text = taggedString.text.slice(beginningWhitespace, trailingWhitespace);
-}
-
 function determineAverageLineWidth(logicalInput: TaggedString,
                                    spacing: number,
                                    maxWidth: number,
                                    glyphMap: {[string]: {[number]: ?StyleGlyph}}) {
     let totalWidth = 0;
 
-    for (let index = 0; index < logicalInput.text.length; index++) {
-        const taggedChar = logicalInput.text[index];
-        const section = logicalInput.sections[taggedChar.section];
-        const glyph = glyphMap[section.fontStack][taggedChar.charCode];
+    for (let index = 0; index < logicalInput.length(); index++) {
+        const section = logicalInput.getSection(index);
+        const glyph = glyphMap[section.fontStack][logicalInput.getCharCode(index)];
         if (!glyph)
             continue;
         totalWidth += glyph.metrics.advance * section.scale + spacing;
@@ -322,10 +340,9 @@ function determineLineBreaks(logicalInput: TaggedString,
 
     let currentX = 0;
 
-    for (let i = 0; i < logicalInput.text.length; i++) {
-        const taggedChar = logicalInput.text[i];
-        const section = logicalInput.sections[taggedChar.section];
-        const codePoint = taggedChar.charCode;
+    for (let i = 0; i < logicalInput.length(); i++) {
+        const section = logicalInput.getSection(i);
+        const codePoint = logicalInput.getCharCode(i);
         const glyph = glyphMap[section.fontStack][codePoint];
 
         if (glyph && !whitespace[codePoint])
@@ -333,7 +350,7 @@ function determineLineBreaks(logicalInput: TaggedString,
 
         // Ideographic characters, spaces, and word-breaking punctuation that often appear without
         // surrounding spaces.
-        if ((i < logicalInput.text.length - 1) &&
+        if ((i < logicalInput.length() - 1) &&
             (breakable[codePoint] ||
                 charAllowsIdeographicBreaking(codePoint))) {
 
@@ -343,14 +360,14 @@ function determineLineBreaks(logicalInput: TaggedString,
                     currentX,
                     targetWidth,
                     potentialLineBreaks,
-                    calculatePenalty(codePoint, logicalInput.text[i + 1].charCode),
+                    calculatePenalty(codePoint, logicalInput.getCharCode(i + 1)),
                     false));
         }
     }
 
     return leastBadBreaks(
         evaluateBreak(
-            logicalInput.text.length,
+            logicalInput.length(),
             currentX,
             targetWidth,
             potentialLineBreaks,
@@ -413,19 +430,18 @@ function shapeLines(shaping: Shaping,
         textJustify === 'left' ? 0 : 0.5;
 
     for (const line of lines) {
-        trimTaggedString(line);
+        line.trim();
 
-        if (!line.text.length) {
+        if (!line.length()) {
             y += lineHeight; // Still need a line feed after empty line
             continue;
         }
 
         let maxScale = 0;
         const lineStartIndex = positionedGlyphs.length;
-        for (let i = 0; i < line.text.length; i++) {
-            const taggedChar = line.text[i];
-            const section = line.sections[taggedChar.section];
-            const codePoint = taggedChar.charCode;
+        for (let i = 0; i < line.length(); i++) {
+            const section = line.getSection(i);
+            const codePoint = line.getCharCode(i);
             const glyph = glyphMap[section.fontStack][codePoint];
 
             if (!glyph) continue;
