@@ -42,10 +42,43 @@ export type Shaping = {
 type SymbolAnchor = 'center' | 'left' | 'right' | 'top' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 type TextJustify = 'left' | 'center' | 'right';
 
-type TaggedString = {
-    text: Array<{ charCode: number, section: number }>,
+class TaggedString {
+    text: Array<{ charCode: number, section: number }>
     sections: Array<{ scale: number, fontStack: string }>
-};
+
+    constructor(text?: string | Formatted, rootFontStack?: string) {
+        this.text = [];
+        this.sections = [];
+
+        if (text) {
+            if (text instanceof Formatted) {
+                for (let i = 0; i < text.sections.length; i++) {
+                    const section = text.sections[i];
+                    this.sections.push({
+                        scale: section.scale || 1,
+                        fontStack: section.fontStack || rootFontStack
+                    });
+                    for (let j = 0; j < section.text.length; j++) {
+                        this.text.push({ charCode: section.text.charCodeAt(j), section: i });
+                    }
+                }
+            } else {
+                this.sections.push({ scale: 1, fontStack: rootFontStack });
+                for (let i = 0; i < text.length; i++) {
+                    this.text.push({ charCode: text.charCodeAt(i), section: 0 });
+                }
+            }
+        }
+    }
+
+    toString() {
+        let result = "";
+        for (let i = 0; i < this.text.length; i++) {
+            result += String.fromCharCode(this.text[i].charCode);
+        }
+        return result;
+    }
+}
 
 function breakLines(input: TaggedString, lineBreakPoints: Array<number>): Array<TaggedString> {
     const lines = [];
@@ -80,24 +113,8 @@ function shapeText(text: string | Formatted,
                    translate: [number, number],
                    verticalHeight: number,
                    writingMode: 1 | 2): Shaping | false {
-    const logicalInput: TaggedString = { text: [], sections: [] };
-    if (text instanceof Formatted) {
-        for (let i = 0; i < text.sections.length; i++) {
-            const section = text.sections[i];
-            logicalInput.sections.push({
-                scale: section.scale || 1,
-                fontStack: section.fontStack || rootFontStack
-            });
-            for (let j = 0; j < section.text.length; j++) {
-                logicalInput.text.push({ charCode: section.text.charCodeAt(j), section: i });
-            }
-        }
-    } else {
-        logicalInput.sections.push({ scale: 1, fontStack: rootFontStack });
-        for (let i = 0; i < text.length; i++) {
-            logicalInput.text.push({ charCode: text.charCodeAt(i), section: 0 });
-        }
-    }
+    const logicalInput = new TaggedString(text, rootFontStack);
+
     if (writingMode === WritingMode.vertical) {
         verticalizePunctuation(logicalInput.text);
     }
@@ -115,13 +132,27 @@ function shapeText(text: string | Formatted,
 
     let lines: Array<TaggedString>;
 
-    // TODO:
-    // const {processBidirectionalText} = rtlTextPlugin;
-    // if (processBidirectionalText) {
-    //     lines = processBidirectionalText(logicalInput, determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
-    // } else {
-    lines = breakLines(logicalInput, determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
-    //}
+    const {processBidirectionalText} = rtlTextPlugin;
+    if (processBidirectionalText && logicalInput.sections.length === 1) {
+        if (logicalInput.sections.length === 1) {
+            // Bidi doesn't have to be style-aware
+            const untaggedLines =
+                processBidirectionalText(logicalInput.toString(), determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
+            lines = [];
+            for (const line of untaggedLines) {
+                const taggedLine = [];
+                for (let i = 0; i < line.length; i++) {
+                    taggedLine.push({ charCode: line.charCodeAt(i), section: 0 });
+                }
+                lines.push({
+                    text: taggedLine,
+                    sections: logicalInput.sections
+                });
+            }
+        }
+    } else {
+        lines = breakLines(logicalInput, determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
+    }
 
     shapeLines(shaping, glyphs, lines, lineHeight, textAnchor, textJustify, writingMode, spacing, verticalHeight);
 
