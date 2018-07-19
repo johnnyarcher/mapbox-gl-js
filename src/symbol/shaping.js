@@ -168,22 +168,36 @@ function shapeText(text: string | Formatted,
 
     let lines: Array<TaggedString>;
 
-    const {processBidirectionalText} = rtlTextPlugin;
+    const {processBidirectionalText, processStyledBidirectionalText} = rtlTextPlugin;
     if (processBidirectionalText && logicalInput.sections.length === 1) {
+        // Bidi doesn't have to be style-aware
         lines = [];
-        if (logicalInput.sections.length === 1) {
-            // Bidi doesn't have to be style-aware
-            const untaggedLines =
-                processBidirectionalText(logicalInput.toString(), determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
-            for (const line of untaggedLines) {
-                const taggedLine = new TaggedString();
-                taggedLine.text = line;
-                taggedLine.sections = logicalInput.sections;
-                for (let i = 0; i < line.length; i++) {
-                    taggedLine.sectionIndex.push(0);
-                }
-                lines.push(taggedLine);
+        const untaggedLines =
+            processBidirectionalText(logicalInput.toString(),
+                                     determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
+        for (const line of untaggedLines) {
+            const taggedLine = new TaggedString();
+            taggedLine.text = line;
+            taggedLine.sections = logicalInput.sections;
+            for (let i = 0; i < line.length; i++) {
+                taggedLine.sectionIndex.push(0);
             }
+            lines.push(taggedLine);
+        }
+    } else if (processStyledBidirectionalText) {
+        // Need version of mapbox-gl-rtl-text with style support for combining RTL text
+        // with formatting
+        lines = [];
+        const processedLines =
+            processStyledBidirectionalText(logicalInput.text,
+                                           logicalInput.sectionIndex,
+                                           determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
+        for (const line of processedLines) {
+            const taggedLine = new TaggedString();
+            taggedLine.text = line[0];
+            taggedLine.sectionIndex = line[1];
+            taggedLine.sections = logicalInput.sections;
+            lines.push(taggedLine);
         }
     } else {
         lines = breakLines(logicalInput, determineLineBreaks(logicalInput, spacing, maxWidth, glyphs));
