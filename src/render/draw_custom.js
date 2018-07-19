@@ -62,7 +62,7 @@ function drawCustom(painter: Painter, sourceCache: SourceCache, layer: CustomSty
         context.setDepthMode(new DepthMode(gl.LEQUAL, DepthMode.ReadWrite, [0, 1]));
         context.setColorMode(painter.colorModeForRenderPass());
 
-        layer.implementation.render3D(painter.context.gl, painter.transform.customLayerMatrix());
+        layer.implementation.render3D(painter.context.gl, painter.transform.customLayerMatrix(layer.implementation.translate, layer.implementation.scale));
 
 
         context.restore();
@@ -84,7 +84,7 @@ function drawExtrusionTexture(painter, layer) {
     context.activeTexture.set(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, renderedTexture.colorAttachment.get());
 
-    gl.uniform1f(program.uniforms.u_opacity, 0.5);//layer.paint.get('fill-extrusion-opacity'));
+    gl.uniform1f(program.uniforms.u_opacity, 1);//layer.paint.get('fill-extrusion-opacity'));
     gl.uniform1i(program.uniforms.u_image, 0);
 
     const matrix = mat4.create();

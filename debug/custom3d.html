@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mapbox GL JS debug page</title>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link rel='stylesheet' href='/dist/mapbox-gl.css' />
+    <style>
+        body { margin: 0; padding: 0; }
+        html, body, #map { height: 100%; }
+    </style>
+</head>
+
+<body>
+<div id='map'></div>
+
+<script src='/dist/mapbox-gl-dev.js'></script>
+<script src='/debug/access_token_generated.js'></script>
+<script>
+
+
+var map = window.map = new mapboxgl.Map({
+    container: 'map',
+    zoom: 12.5,
+    center: [-77.01866, 38.888],
+    style: 'mapbox://styles/mapbox/streets-v10',
+    hash: true
+});
+
+const gl = map.painter.context.gl;
+
+const vertexSource = `
+
+attribute vec3 a_pos;
+uniform mat4 u_matrix;
+
+void main() {
+    gl_Position = u_matrix * vec4(a_pos, 1.0);
+}
+`;
+
+const fragmentSource = `
+void main() {
+    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+}
+`;
+
+const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+gl.shaderSource(vertexShader, vertexSource);
+gl.compileShader(vertexShader);
+const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+gl.shaderSource(fragmentShader, fragmentSource);
+gl.compileShader(fragmentShader);
+
+const program = gl.createProgram();
+gl.attachShader(program, vertexShader);
+gl.attachShader(program, fragmentShader);
+gl.linkProgram(program);
+gl.validateProgram(program);
+
+program.a_pos = gl.getAttribLocation(program, "a_pos");
+program.u_matrix = gl.getUniformLocation(program, "u_matrix");
+
+const x = 0;
+const y = 0;
+const z = 50;
+const d = 9;
+
+const vertexArray = new Float32Array([
+        x, y, 0,
+        x + d, y, 0,
+        x, y + d, z,
+        x + d, y + d, z]);
+const indexArray = new Uint16Array([
+        0, 1, 2,
+        1, 2, 3
+]);
+
+const vertexBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
+const indexBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexArray, gl.STATIC_DRAW);
+
+class Custom {
+    constructor() {
+        this.id = 'mycustomlayer';
+        this.type = 'custom';
+        this.translate = [0.27945743888888896, 0.364928466136303];
+        this.scale = 0.000001;
+    }
+
+    render3D(gl, matrix) {
+        gl.useProgram(program);
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+        gl.enableVertexAttribArray(program.a_pos);
+        gl.vertexAttribPointer(program.a_pos, 3, gl.FLOAT, false, 0, 0);
+        gl.uniformMatrix4fv(program.u_matrix, false, new Float32Array(matrix));
+        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+    }
+
+    hasTransition() {
+        return false;
+    }
+
+}
+
+map.on('load', function() {
+    map.addLayer({
+        id: 'build',
+        type: 'fill-extrusion',
+        source: 'composite',
+        'source-layer': 'building',
+        paint: {
+            'fill-extrusion-color': '#ac5',
+            'fill-extrusion-height': 30
+        }
+    });
+
+    map.addLayer(new Custom());
+});
+
+</script>
+</body>
+</html>

@@ -266,6 +266,10 @@ class Transform {
     zoomScale(zoom: number) { return Math.pow(2, zoom); }
     scaleZoom(scale: number) { return Math.log(scale) / Math.LN2; }
 
+    projectCustom(lngLat) {
+        return this.project(lngLat)._div(this.worldSize);
+    }
+
     project(lnglat: LngLat) {
         return new Point(
             this.lngX(lnglat.lng),
@@ -425,8 +429,14 @@ class Transform {
         return cache[posMatrixKey];
     }
 
-    customLayerMatrix(): Float64Array {
-        return mat4.scale(new Float64Array(16), this.projMatrix, [this.worldSize, this.worldSize, 1]);
+    customLayerMatrix(translate, scale): Float64Array {
+
+        const posMatrix = mat4.identity(new Float64Array(16));
+        if (translate) mat4.translate(posMatrix, posMatrix, [translate[0], translate[1], 0]);
+        if (scale) mat4.scale(posMatrix, posMatrix, [scale, scale, 1]);
+        const proj = mat4.scale(new Float64Array(16), this.projMatrix, [this.worldSize, this.worldSize, 1]);
+
+        return mat4.multiply(posMatrix, proj, posMatrix);
     }
 
     _constrain() {

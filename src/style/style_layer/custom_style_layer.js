@@ -28,6 +28,14 @@ class CustomStyleLayer extends StyleLayer {
     serialize() {
         throw "Custom layers cannot be serialized";
     }
+
+    resize() {
+        console.log('destroy');
+        if (this.viewportFrame) {
+            this.viewportFrame.destroy();
+            this.viewportFrame = null;
+        }
+    }
 }
 
 export default CustomStyleLayer;
